@@ -1,0 +1,552 @@
+%\VignetteIndexEntry{mmnet}
+%\VignetteKeywords{mmnet}
+%\VignettePackage{mmnet}
+%\VignetteEngine{knitr::knitr}
+
+\documentclass[a4paper]{article}
+\usepackage{times}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{amsmath}
+%\usepackage{Sweave}
+\usepackage[utf8]{inputenc}
+%\usepackage[pdftex]{graphicx}
+\usepackage{url} 
+
+
+\title{mmnet: Metagenomic analysis of microbiome metabolic network}
+\author{Yang Cao, Fei Li, Xiaochen Bo}
+
+\begin{document}
+
+<<include=FALSE>>=
+library(knitr)
+options(width=64,digits=2)
+opts_chunk$set(size="small")
+opts_chunk$set(tidy=TRUE,tidy.opts=list(width.cutoff=50,keep.blank.line=TRUE))
+opts_knit$set(eval.after='fig.cap')
+# for a package vignette, you do want to echo.
+# opts_chunk$set(echo=FALSE,warning=FALSE,message=FALSE)
+opts_chunk$set(warning=FALSE,message=FALSE)
+opts_chunk$set(cache=TRUE,cache.path="cache/mmnet")
+@
+
+\bibliographystyle{plainnat}
+
+%\SweaveOpts{highlight=TRUE, tidy=TRUE, keep.space=TRUE, keep.blank.space=FALSE, keep.comment=TRUE}
+\maketitle
+\tableofcontents
+
+\section{Introduction}
+
+This manual is a brief introduction to structure, functions and usage of \emph{mmnet} package. The \emph{mmnet} package provides a set of functions to support systems analysis of metagenomic data in R,  including annotation of raw metagenomic sequence data, construction of metabolic network, and differential network analysis based on state specific metabolic network and enzymatic gene abundance. 
+
+Meanwhile, the package supports an analysis pipeline for metagenomic systems biology. We can simply start from raw metagenomic sequence data, optionally use MG-RAST to rapidly retrieve metagenomic annotation, fetch pathway data from KEGG using its API to construct metabolic network, and then utilize a metagenomic systems biology computational framework mentioned in \citep{greenblum2012metagenomic} to establish further differential network analysis. 
+
+The main features of \emph{mmnet}: 
+
+  \begin{itemize}
+    \item Annotation of metagenomic sequence reads with MG-RAST
+    \item Estimating abundances of enzymatic gene based on functional annotation
+    \item Constructing State Specific metabolic Network
+    \item Topological network analysis 
+    \item Differential network analysis
+  \end{itemize}
+
+\subsection{Installation}
+
+\emph{mmnet} requires these packages: \emph{KEGGREST}, \emph{igraph}, \emph{Biobase}, \emph{XML}, \emph{RCurl}, \emph{RJSONIO}, \emph{stringr}, \emph{ggplot2} and \emph{biom}. These should be installed automatically when you install \emph{mmnet} with biocLite() as follows: 
+
+%For more functionally, users should install the latest devel version \emph{mmnet}. Install the latest release of R, then get the latest version of Bioconductor by starting R and entering the commands:
+
+<<install-pkg, eval=FALSE>>==
+## install release version of mmnet
+source("http://bioconductor.org/biocLite.R")
+biocLite("mmnet")
+
+##install the latest development version 
+useDevel()
+biocLite("mmnet")
+@
+
+It should be noted that the function call useDevel() calling is chechout to the development versino of BIOCONDUCTOR and it will be install the latest development version of mmnet, which has more functions available and a lot of bugs fixed.
+
+After installation, the \emph{mmnet} is ready to load into the current workspace by the following codes to the current workspace by typing or pasting the following codes:
+
+<<load-pkg,eval=TRUE, include=FALSE>>==
+library(mmnet)
+@
+<<load-pkg2,eval=FALSE>>==
+library(mmnet)
+@
+
+%\subsection{Further help} 
+
+%To view the \emph{mmnet} description and a summary of all the functions within \emph{mmnet} type the following:
+
+%<<help-pkg,eval=FALSE>>==
+%library(help = mmnet)
+%@
+
+%Thanks for using this package. Please contact us if there are any bugs or suggustiones.
+
+\section{Analysis Pipeline: from raw Metagenomic Sequence Data to Metabolic Network Analysis}
+
+We will demonstrate go through an analysis pipeline to illustrate some of the main functions in \emph{mmnet}. This pipeline consists of several steps:
+
+\begin{enumerate}
+\item  Raw metagenomic sequence data: prepare a specific amount of sequence data ready 
+       to  analyze from metagenomic studies. You can get the data by short-gun sequencing or download raw data available online. Here we download a sample data from ftp of MG-RAST.
+
+\item Functional annotation: raw reads must be processed for functional annotation to 
+      mapping to enzyme libraries with existing knowledge, such as KEGG database.
+
+\item State Specific Network: start from an enzyme set, we can map these enzymes onto   
+      metabolic pathways to construct a relatively small metabolic network with abundance involved in specific biological states, named State Specific Network (SSN).
+
+\item Topological and differential network analysis: topological network analysis 
+      performs a series of correlation analysis between enzyme abundances and topological properties, i.e. betweenness or pageRank. Meanwhile differential network analysis compares the enzyme abundances and structure of different state specific networks.
+\end{enumerate}
+
+%A public dataset which have been annotated in MG-RAST was taken for demenstration purposes since the time metagenomic sequence taken on MG-RAST will range between a few hours and days. There is only a simple code example for microbiome functional annotation.
+
+%The sample data is consisting of several microbiomes from twin pairs and their mothers and available in MG-RAST.
+
+
+%\subsection{Local KEGG orthology dataset and reference metabolic network constructing}
+
+\subsection{Prepare metagenomic sequence data}
+
+Acceptable sequence data can be in FASTA, FASTQ or SFF format. These are recognized by the file name extension with valid extensions for the appropriate formats .fasta, .fna, .fastq, .fq, and .sff and FASTA and FASTQ files need to be in plain text ASCII. An easy way to get some sequence data is to download public dataset from MG-RAST. Here we download two FASTA data sets from MG-RAST ftp server, which corresponds two metagenomic samples with different physiological states (MG-RAST ID: 4440616.3 and 4440823.3). These data sets are consisting of several microbiomes from twin pairs and their mothers \citep{turnbaugh2008core}. 
+
+<<sample-download, eval=FALSE>>==
+download.file("ftp://ftp.metagenomics.anl.gov/projects/10/4440616.3/raw/507.fna.gz", 
+              destfile = "obesesample.fna.gz")
+download.file("ftp://ftp.metagenomics.anl.gov/projects/10/4440823.3/raw/687.fna.gz", 
+              destfile = "leansample.fna.gz")
+@
+
+
+\subsection{Annotation of Metagenomic Sequence Reads}
+
+Functional annotation of microbiome is a crucial step for subsequent analysis. Many tools can be used to identify functions of sequences. Meanwhile, local analysis tools and annotation database need complicated installation and configuration, and suppose users have deep understanding on high performance computing and next generation sequencing, that requires users have sufficient preparing time, technical kills and computing resource.
+
+To facilitate the analysis of microbiome metabolic network, \emph{mmnet} provides functions for sequence annotation linking \emph{R} with MG-RAST. MG-RAST \citep{glass2010using} is a stable, extensible, online analysis platform for annotation and statistic metagenomes based on sequence data. Moreover, MG-RAST is freely available to all researchers. For more details, see \url{http://metagenomics.anl.gov}.
+
+By integrating the web service provided by MG-RAST into R environment. \emph{mmnet} provides several functions for assigning functional annotation to reads : \textit{loginMgrast},\textit{uploadMgrast}, \textit{submitMgrastJob}, \textit{listMgrastProject} and \textit{checkMgrastMetagenome}.
+
+%Function \emph{runMgrastJob} is a wrapper for the functions for annotation in the mmnet package, which achieves processing from sequence uploading to annotation profile dowloading, and will return the annotatation profile after annotation complete on MGRAST.
+
+Before use the MG-RAST services, we need register and login a MG-RAST account to access its service. Registration needs to be done on the website. Login can be processed by function \textit{loginMgrast}. After successful calling this function with user’s name and password, a session variable login.info is returned for further access to MG-RAST service. It should be noted that username 'mmnet' with password 'mmnet' was already registered for testing purpose. See '?loginMgrast' for more details.  
+
+<<login-mgrast, eval = FALSE, echo=TRUE>>==
+## login on MG-RAST 
+ login.info <- loginMgrast(user="mmnet",userpwd="mmnet")
+@ 
+
+After login, the next step is to upload raw sequence data (obesesample.fna.gz and leansample.fna.ga in here) to your MG-RAST inbox. Function \textit{uploadMgrast} is designed to get the job done easily.
+
+<<upload-mgrast, eval=FALSE,echo=TRUE>>== 
+## select the sample data to upload
+seq.file <- c("obesesample.fna.gz", "leansample.fna.gz")
+## upload sequence data to MG-RAST
+metagenome.id <- lapply(seq.file, uploadMgrast, login.info = login.info)
+@
+
+\emph{Note: According to MG-RAST user manual, uploaded files may be removed from your inbox after 72 hours. So please perform submission of your files within that time frame.}
+
+Once the sequence data is uploaded to your MGRAST inbox, users could submit one MGRAST job to annotate each sequence files in your inbox with function \textit{submitMgrastJob}. 
+
+<<submit-mgrast, eval=FALSE, echo=TRUE>>== 
+## submit MGRAST job
+  metagenome.id <- lapply(seq.file, submitMgrastJob, login.info = login.info)
+  show(metagenome.id)
+@
+
+It should be noticed that our sample metagenomic sequences downloaded from the MG-RAST have been annotated,  so it will return the corresponding metagenome ID that already exists in MG-RAST without duplicated annotation.
+
+In other cases, the annotation process may take several hours or days. Thus, here we provide a function \textit{checkMgrastMetagenome} to check whether your metagenome annotation is completed or in processing.
+
+<<check-metagenome, eval=FALSE,echo=TRUE>>== 
+## check MGRAST project status
+  metagenome.status <- lapply(metagenome.id, checkMgrastMetagenome, login.info = login.info)
+## apparently, status of completed annotation metagenome is TRUE 
+  show(metagenome.status)
+@
+
+
+Once the annotation process completes, the  metagenome ID can be obtained by function \textit{getMgrastAnnotation}   to load the functional annotation profile separately for subsequent metabolic analysis. For private data, you must login on MGRAST to get login.info and call \textit{getMgrastAnnotation} with login.info.  For more details see \textit{'getMgrastAnnotation'}.
+
+<<getannotation,eval=FALSE, echo=TRUE>>==
+## private data
+  private.annotation <- lapply(metagenome.id, getMgrastAnnotation, login.info=login.info)
+## public annotation data, does not require login.info 
+  public.annotation <- lapply(metagenome.id, getMgrastAnnotation)
+@
+
+
+For  convenience, we have save this annotation profiles in \emph{mmnet} names \textit{'anno.rda'}. See \textit{'anno'} for more details. Loading annotation profiles as follows:
+
+<<data-load>>==
+data(anno)
+summary(anno)
+@
+
+Here, we show an entire process which integrates all the functions above, from sequence uploading to annotation profile downloading, and retrieve the annotation profile after MG-RAST annotation completed.
+ 
+<<MG-RAST-mmnet, eval=FALSE>>==
+## first login on MG-RAST
+login.info <- loginMgrast("mmnet", "mmnet")
+## prepare the metagenomic sequence for annotation
+seq <- "obesesample.fna.gz"
+## mgrast annotation
+uploadMgrast(login.info, seq)
+metagenome.id2 <- submitMgrastJob(login.info, seqfile = basename(seq)) 
+while (TRUE) { 
+  status <- checkMgrastMetagenome(metagenome.id = metagenome.id2)
+  if (status)
+    break
+  Sys.sleep(5)
+  cat("In annotation, please waiting...")
+  flush.console()
+}
+## if annotation profile is public,take login.info as NULL
+anno2 <- getMgrastAnnotation(metagenome.id2, login.info=login.info)
+@
+%<<runMgrastJob,echo=TRUE>>==
+%## provide the MG-RAST account,rawsequence, and the project name you will creat, 
+%## annotation of your sequence iss automatically processing on MG-RAST 
+%## here will return a MG-RAST job id
+%# runMgrastAnnotation(seqfiles,user,userpwd,new_project)
+%@
+
+ 
+
+%To check your MG-RAST job status, we have to call \textit{loginMgrast} to login MGRAST first. See \texttt{'?loginMgrast'} for details. It returns the login information (contains webkey, websession etc) as an authenticate of subsequent operation on MG-RAST.
+
+%<<checkProject-mgrast, echo=TRUE>>==
+%## loginMgrast help user login MG-RAST if not login
+%# login.info <- loginMgrast(user="mmnet",userpwd="mmnet")
+%# names(login.info)
+
+%#
+%project.status <- checkMgrastProject(login.info)
+%@
+ 
+
+
+\subsection{Estimating the abundance of enzymatic genes}
+
+Enzyme abundance varies in different biological states. Enzymatic gene abundances are important for microbial marker-gene and disease study, especially for linking microbial genes with the host state. Here, we estimate enzymatic gene abundances based on read counts with a normalization procedure.
+
+%\subsubsection{Example Data}
+
+%As mentioned above, a public dataset \citep{turnbaugh2008core} was taken for example data, four samples (two obese, two lean) of mpg10 (metagenome project 10) in MGRAST. More details about this dataset is in \url{http://metagenomics.anl.gov/metagenomics.cgi?page=MetagenomeProject&project=10}. Apparently, user could obtain the annatated information with function \textit{getMgrastAnnotation} online. For saving claculating time, we have saved it as \textit{mpg10Anno.rda} in \emph{mmnet}. It can be loaded by typing or pasting the following:
+
+%<<testData,echo=TRUE>>==
+%## the test data from the dataset mpg10 in MG-RAST, four microbiome, 
+%# two obese and two lean
+  %data(mgp10Anno)
+  %summary(mgp10Anno)
+%
+%subsubsection{Estimating the abundance of enzymatic genes}
+
+To estimate the abundance of enzymatic genes, \textit{estimateAbundance} function should be called for each sample. A widely used in metagenomic analysis format - Biological Observation Matrix (BIOM) \citep{mcdonald2012biological} format will be return by this function. The BIOM file format (canonically pronounced biome) is designed to be a general-use format for representing biological sample by observation contingency tables. More details on BIOM file can be found in \url{http://biom-format.org/}.
+
+<<estimate, echo=TRUE>>==
+ mmnet.abund <- estimateAbundance(anno)
+ show(mmnet.abund)
+@
+
+Furthermore, BIOM abundance file was also supported by other tools. Take MG-RAST for example, user could download the enzymatic genes abundance profile with MG-RAST API. Moreover, while samples have been annotated with other tools (e.g. blast to KEGG locally), users could create their own BIOM files represents enzymatic genes abundance and import them for metagenomic systems biology analysis.
+
+<<MG-RAST-BIOM, fig.align='center',fig.cap='enzymatic genes abundance comparison between MG-RAST and mmnet package',dev='pdf',fig.show='hold',out.width='.7\\linewidth', out.height='.7\\linewidth'>>==
+## download BIOM functional abundance profile of the two sample metagenome from MG-RAST
+if(require(RCurl)){
+  function.api <- "http://api.metagenomics.anl.gov/1/matrix/function"
+  mgrast.abund <- read_biom(getForm(function.api,
+                             .params=list(id="mgm4440616.3",id="mgm4440823.3",
+                                          source="KO",result_type="abundance")))
+}
+## obtain the intersect ko abundance of MG-RAST and esimatiAbundance
+intersect.ko <- intersect(rownames(mgrast.abund),rownames(mmnet.abund))
+## compare the two by taking one metagenome
+mgrast.abund1 <- biom_data(mgrast.abund)[,1][intersect.ko]
+mmnet.abund1 <- biom_data(mmnet.abund)[,1][intersect.ko]
+if(require(ggplot2)){
+  p <- qplot(mgrast.abund1,mmnet.abund1) + 
+            geom_abline(slope=1, intercept=0,color="blue") +
+            ylim(0, 400) + xlim(0, 400)
+  print(p)
+}
+@
+
+
+The enzymatic gene abundances estimated by MG-RAST is un-calibrated and un-optimized compared to the method in \emph{mmnet}. As show in Figure 1, abundances in MG-RAST is over-estimated in most cases, especially on high abundance enzymatic genes. The details on abundances calibration in \emph{mmnet} is as follows: Sequences were annotated with all KOs (KEGG orthologous groups) of the top KO-associated match among the top 100 matches; Sequences with multiple top KO-associated matches with the same e-value were annotated with the union set of KOs; To make a balance between identifying low-abundance genes and reducing the error-rate of identification a threshold of 2 reads to allow the inclusion of rare genes and all KO abundances below this threshold were set to zero. 
+
+For other tools, users can download the annotated data first. Taking IMG/M for example, metagenomic annotation data from IMG/M includes the abundance information. Thus, we can construct the metabolic network without abundance estimation directly. It can be accessed as following:
+1)	In package mmnet, function to construct metabolic network takes BIOM file as input. We create the BIOM file for network construction first:
+
+<<IMGSample, eval=FALSE >>==
+## Load the IMG/M sample data
+IMGFile <- system.file("extdata/IMGSample.tab",package="mmnet")
+IMGSample <- read.delim2(IMGFile,quote = "") 
+## Create BIOM file for network construction
+abundance <- IMGSample$Gene.Count 
+abundance <- abundance/sum(abundance)
+abundance <- as.data.frame(abundance)
+KO <- IMGSample$KO.ID 
+KO <- as.data.frame(gsub("KO:","",KO)) 
+biom.data <- make_biom(abundance, observation_metadata = KO)
+biom.data$type <- "enzymatic genes abundance"
+@
+
+2)	Then we construct and analyze the SSN:
+
+<<IMGSample2, eval=FALSE >>==
+## Construct and analyze SSN
+ssn <- constructSSN(biom.data)
+topologicalAnalyzeNet(ssn)
+@
+
+Futhermore, users may have annotated the metagenomic reads locally, the annotated profile should be preprocessed in format as the MGRAST annotation profile that have 13 columns. Details:
+
+1.	Read id
+
+2.	Hit id, ref sequence id
+
+3.	percentage identity, e.g. 100.00
+
+4.	alignment length, e.g. 107
+
+5.	number of mismatches, e.g. 0
+
+6.	number of gap openings, e.g. 0
+
+7.	query start, e.g. 1
+
+8.	query .end, e.g. 107
+
+9.	hit start, e.g. 1262
+
+10.	hit .end, e.g. 1156
+
+11.	e-value, e.g. 1.7e-54
+
+12.	score in bits, e.g. 210.0
+
+13.	KEGG orthology
+
+Then we can analyze the annotation profile properly as profile from MG-RAST.
+We also have added this description to the vignette of mmnet to help users analyze the annotation profiles from the other tools. And we still strive to improve our package with good support for other tools. 
+
+
+%For comparative analysis among samples with different state (e.g. obese or lean), correlation coefficient was used to measure relative KO abundance across the samples.
+
+%<<correlation,echo=TRUE>>==
+%## pearson correlation
+ %data <- biom_data(mmnet.abund)
+ %cor(as.matrix(data),method = "pearson")
+%@
+%Appanrently, KO abundance across all samples was highly concordant (great than 0.77)
+
+\subsection{Building reference metabolic dataset}
+
+This package takes KEGG database to annotate enzymatic genes with metabolic reactions which is the basis representation for all proteins and functional RNAs corresponding to KEGG pathway nodes, BRITE hierarchy nodes, and KEGG module nodes to annotation the microbiome.  The KEGG metabolic pathway is the best organized part of KEGG PATHWAY database, and also is a network of KO-KO  relations \citep{kanehisa2000kegg}. It is composed of KO, substrate and product of KO, and have been applied widely to create genome-scale metabolic networks of various microbial species \citep{oberhardt2009applications}. 
+
+ \emph{This reference metabolic data was obtained with the KEGG free REST API, about 150 KEGG reference pathways. And KEGG API is provided for academic use by academic users belonging to academic institutions. This service should not be used for bulk data downloads. Thus, our small download with KEGG API is in agreement with the license.}
+
+An initial reference data named \textit{RefDbcache.rda} was saved in "data" subdirectory of \emph{mment} that contains KOs and annotated with a metabolic reaction. Moreover, an KO based reference metabolic network was also saved in \textit{RefDbcache.rda}, where nodes represent enzymes (KOs), and the directed edge from enzyme A to enzyme B indicates that a product metabolite of a reaction catalyzed by enzyme A is a substrate metabolite of a reaction catalyzed by enzyme B. As KEGG database is constantly updated, reference data can be updated by function \textit{updateMetabolicNetwork} manually and saved in the directory user specified.
+
+Reference dataset can be loaded by function \textit{loadMetabolicData}
+
+<<initial-data,echo=TRUE>>=
+loadMetabolicData()
+summary(RefDbcache)
+@
+
+\subsection{Constructing State Specific Network}
+
+% The \emph{mmnet} provides function \emph{mapAnnotoKEGGPathway} for mapping the KOs  on KEGG global metabolic pathway. This function returns an url of colored map, users may automated open the url by optional "browse" or manually open it.
+
+% <<showKEGGPathway,echo=TRUE>>==
+% colored.map <- showKEGGPathway(names(mmnet.abund[[1]]), map.color="blue")
+% @
+
+% The colored KEGG global metabolic map with example metagenomic data.
+
+% \begin{figure}[h]
+% \centering\includegraphics{2ec01100.png}
+% \caption{A example colored KEGG global map}\label{fig:01}
+% \end{figure} 
+
+% The colored KEGG global metabolic map with example metagenomic data.
+
+Different biological states (e.g. obese or lean)  can be identified based on different enzymatic gene set and abundances. In network view, different biological states associates different metabolic sub-network with different abundances, named as State Specific Network (SSN). We provide function \textit{constructSSN} to construct the reference network to obtain the state specific metabolic network for each microbiome. It could take the output of function \emph{estimateAbundance} as input, give the SSN as output.
+
+<<construct-network,echo=TRUE>>==
+  ssn <- constructSSN(mmnet.abund)
+  g <- ssn[[1]]
+  summary(g)
+  abund <- get.vertex.attribute(g,"abundance",index=V(g))
+  summary(abund)
+@
+
+\subsection{Topological network analysis}
+
+ To examine whether enzymes that are associated with a specific host state exhibit some topological features in the SSN, we provide function \textit{topologicalAnalyzeNet} to compute and illustrate the correlations between the topological properties of enzymatic genes and their abundances. It links the difference abundance with the topological correlation (Figure 2). Common topological features are supported. See \textit{'?topologicalAnalyzeNet'} for details. 
+
+%\begin{figure}[!htbp]
+%  \begin{center}
+%<<topologicalAnalyzeNet, echo=TRUE, fig=TRUE>>==
+% topo.feature <- topologicalAnalyzeNet(g)
+
+% ## network with topological features as attributes
+% topo.feature
+%@
+%\caption{Scatterplot between abundance and topological features}\label{fig:01}
+%  \end{center}
+%\end{figure}
+
+<<topologicalAnalyzeNet,echo=TRUE,fig.align='center',fig.cap='Topological metabolic network analysis, linking topological features and enzymatic gene abundances',dev='pdf',fig.show='hold',out.width='.7\\linewidth', out.height='.7\\linewidth'>>==
+topo.net <- topologicalAnalyzeNet(g)
+## network with topological features as attributes
+topo.net
+@
+
+\subsection{Differential network analysis}
+
+To compare the abundance of enzymatic genes across various samples, we take three strategies to identify the differential abundance (enrich or deplete), including (1) odds ratio, (2) difference rank and (3) Jensen-Shannon Divergence (JSD). The corresponding function \textit{differentialAnalyzeNet} outputs the comparative network with nodes of differential abundance as result (Figure 3).
+
+%\begin{figure}[!htbp]
+%  \begin{center}
+%<<compareState, echo = TRUE, fig = TRUE>>==
+% comparedNet <- compareSSN(mmnet.abund, method="OR", cutoff = c(0.5, 2))
+% summary(comparedNet)
+%@
+%\caption{A metabolic network for multiple sample, KOs that are associated with specific state appear as colored nodes (red=enriched, green%=depleted)}\label{fig:02}
+%  \end{center}
+%\end{figure}
+<<differential,echo=TRUE,fig.align='center',fig.cap='Differential metabolic network analysis, enzymatic genes that are associated with specific state appear as colored nodes (red=enriched, green=depleted)',dev='pdf',fig.show='hold',out.width='.7\\linewidth', out.height='.7\\linewidth'>>==
+state <- c("obese", "lean")
+differential.net <- differentialAnalyzeNet(ssn, sample.state= state, method="OR", cutoff = c(0.5, 2))
+summary(differential.net)
+@
+
+\subsection{Network Visualization}
+
+Both function \textit{topologicalAnalyzeNet} and \textit{differentialAnalyzeNet} utilize function \textit{showMetagenomicNet} to plot the metabolic network. The showMetagenomicNet can also be used to personalized network display by specifying appropriate parameters (Figure 4).
+
+%\begin{figure}[!htbp]
+%  \begin{center}
+%<<showMetagenomicNet,echo=TRUE,fig=TRUE>>==
+%## the reference network
+%# showMetagenomicNet(RefDbcache$network,mode="ref")
+%#the state specific metabolic network
+%showMetagenomicNet(g, mode="ssn", vertex.label = NA, 
+%        edge.width = 0.3, edge.arrow.size = 0.1, edge.arrow.width = 0.1, 
+%        layout = layout.fruchterman.reingold, vertex.size = 3)
+
+%@
+%\caption{A metabolic network for single sample, node size is positive proportional log(abundance)}\label{fig:03}
+%\end{center}
+%\end{figure}
+<<showMetagenomicNet,echo=TRUE,fig.align='center',fig.cap='Visualization of State Specific Network  using \textit{showMetagenomicNet} with node size  proportional to log(abundance)',dev='pdf',fig.show='hold', out.width='.7\\linewidth', out.height='.7\\linewidth'>>==
+## the reference network
+# showMetagenomicNet(RefDbcache$network,mode="ref")
+#the state specific metabolic network
+showMetagenomicNet(g, mode="ssn", vertex.label = NA, edge.width = 0.3, edge.arrow.size = 0.1, edge.arrow.width = 0.1, layout = layout.fruchterman.reingold)
+@
+
+\section{Analysis in Cytoscape}
+
+Here is a simple example to show the reference metabolic network in Cytoscape with \textit{RCytoscape} package (Figure 5). \textit{Cytoscape2.8}, and \textit{CytoscapeRPC}: a Cytoscape plugin is required besides of R package RCytoscape. See \textit{RCytoscape} package for details on 'how to transfer the network and attributes from R to Cytoscape’.
+
+Open Cytoscape,  and then activate the CytoscapeRPC plugin in Cytoscape’s Plugins menu. Click to start the XMLRPC server in the dialog, and Cytoscape will wait for commands from R. In the default setting, the communicate port is 9000 on localhost. You can choose a different port, just be sure to use that changed port number when you call the RCytoscape constructor.
+
+Then, type the following commands in R:
+
+<<RCytoscape, eval = FALSE, echo = TRUE>>==
+if (require(RCytoscape)){
+  refnet <- ssn[[1]]
+  net <- igraph.to.graphNEL(refnet)
+  ## initialize the edge attibute
+  #edge.attr=list.edge.attributes(refnet)
+  #edge.attr.class = sapply(edge.attr, class)
+  #edge.attr.class[edge.attr.class=="character"]="char"
+  ## init node attributes
+  node.attr=list.vertex.attributes(refnet)
+  if (length(node.attr)){
+    node.attr.class = sapply(node.attr, class)
+    node.attr.class[node.attr.class=="character"]="char"
+    for (i in 1:length(node.attr))
+      net<- initNodeAttribute(net, attribute.name = node.attr[i], 
+                            attribute.type = node.attr.class[i], default.value = "0")
+  }
+  ## our metagenomic network does not have edge attributes, set them all to 1 
+  net <- initEdgeAttribute(net, attribute.name = "weight", 
+                              attribute.type = "numeric", default.value = "1")
+  ## create a network window in Cytoscape
+  cw <- new.CytoscapeWindow ('net', graph = net, overwriteWindow = TRUE)
+  ## transmits the CytoscapeWindowClass's graph data, from R to Cytoscape, nodes, 
+  ## edges, node and edge attributes
+  displayGraph (cw)
+}
+@
+
+
+\begin{figure}{h}
+\centerline{\includegraphics[width=0.7\paperwidth]{Refnet.png}}
+\caption{Export netowork to Cytoscape with \emph{RCytoscape} package}\label{fig:04}
+\end{figure} 
+
+
+% \begin{figure}[!htbp]
+%   \begin{center}
+% <<showMetagenomicNet2,echo=TRUE, fig=TRUE>>=
+% ## the compared network
+% showMetagenomicNet(comparedNet,mode="compared",method="OR")
+% @
+% \caption{A metabolic network for multiple sample, KOs that are associated with specific state appear as colored nodes (red=enriched, green=depleted).}\label{fig:03}
+% \end{center}
+% \end{figure}
+
+ 
+
+
+
+%<<update-kegg,echo=TRUE>>==
+%## the updated data can be saved in your workongspace defaultly
+%# updateKEGGPathway(path = Sys.getenv("HOME"))
+%@
+
+%
+
+%<<referenceNet,echo=TRUE>>==
+%## reference network construction saved as igraph object
+%# require(igraph)
+%# refNet <- constuctMetabolicNetkwrok(RefDbcache) 
+%@
+\section*{Session Information}
+
+The version number of R and packages loaded for generating the vignette were:
+
+<<echo=FALSE>>=
+sessionInfo()
+@
+
+\section*{Cleanup}
+
+
+This is a cleanup step for the vignette on Windows; typically not
+needed for users.
+
+<<closeConnetions>>=
+allCon <- showConnections()
+socketCon <- as.integer(rownames(allCon)[allCon[, "class"] == "sockconn"])
+sapply(socketCon, function(ii) close.connection(getConnection(ii)) )
+@
+
+\bibliography{mmnet}
+
+\end{document}
