@@ -4,7 +4,7 @@ saveMetabolicData <- function(RefDbcache, path = Sys.getenv("HOME")) {
     RefDbcache$date <- date()
     RefDbcache$version <- R.Version()
     RefDbcache$date <- date()
-    RefDbcache$network <- constructMetabolicNetwork(path)
+    RefDbcache$network <- constructMetabolicNetwork(RefDbcache, path)
     message("saving data to the Specified dir...", domain = NA)
     path <- sprintf("%s/%s", path, ".mmnet")
     if (!file.exists(path)) 

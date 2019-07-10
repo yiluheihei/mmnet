@@ -1,5 +1,5 @@
-constructMetabolicNetwork <- function(path = Sys.getenv("HOME")) {
-    loadMetabolicData(path)
+constructMetabolicNetwork <- function(RefDbcache, path = Sys.getenv("HOME")) {
+    # loadMetabolicData(path)
     product <- RefDbcache$product
     substrate <- RefDbcache$substrate
     message("construct the edge matrix of ko according to metabolites")
