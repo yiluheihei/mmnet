@@ -10,15 +10,13 @@ export(topologicalAnalyzeNet, checkMgrastMetagenome, listMgrastProject, differen
   preprocessKOMetabolites, saveMetabolicData, submitMgrastJob, 
   updateKEGGPathway, uploadMgrast, constructSSN, showMetagenomicNet)
 
-importFrom(Biobase, isUnique, listLen)
+importFrom(Biobase, listLen)
 importFrom(stringr, "str_sub<-", str_sub, str_extract_all, str_extract)
 importFrom(plyr, laply, alply, d_ply, ldply, llply )
 importFrom(ggplot2, ggplot, aes, aes_string, geom_point, stat_smooth, facet_wrap, scale_x_log10, scale_y_log10)
 importFrom(reshape2, melt)
 importFrom(RJSONIO, fromJSON, toJSON)
-importFrom(KEGGREST, keggList, keggGet)
 importFrom(RCurl, getURL, postForm, getForm, getCurlHandle, getCurlInfo, fileUpload, curlGlobalInit)
-importFrom(XML, htmlParse, xmlDoc, xpathApply, getNodeSet, toString.XMLNode, xmlRoot, xmlSApply,   
-  xmlAttrs, xmlChildren, xmlValue, xmlTreeParse)
+importFrom(XML, htmlParse, xmlDoc, xpathApply, getNodeSet, toString.XMLNode, xmlValue)
 importFrom(flexmix, KLdiv)
 importFrom(tools, file_path_sans_ext)
