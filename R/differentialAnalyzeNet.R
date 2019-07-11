@@ -11,9 +11,6 @@ differentialAnalyzeNet <- function(ssns, sample.state, method = c("OR", "rank", 
         ratio <- lapply(abund,fodds)
         return(odds.ratio = Reduce("/", ratio))
     }
-    if (!exists("RefDbcache"))
-	    loadMetabolicData(path = Sys.getenv("HOME"))
-    RefDbcache <- get("RefDbcache", envir = parent.frame())
     ##ko.abund <- c(...)
     abund <- lapply(ssns, function(x){
       abund = get.vertex.attribute((x), name="abundance")

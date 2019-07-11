@@ -3,12 +3,10 @@ import(Matrix)
 import(methods)
 import(biom)
 
-export(topologicalAnalyzeNet, checkMgrastMetagenome, listMgrastProject, differentialAnalyzeNet, constructMetabolicNetwork,
-  delMgrastInbox, estimateAbundance, generateMgrastWebkey,
-  generateMgrastWebsession, getKOPathwayInfo, getMgrastAnnotation,
-  listMgrastInbox, loadMetabolicData, loginMgrast,
-  preprocessKOMetabolites, saveMetabolicData, submitMgrastJob, 
-  updateKEGGPathway, uploadMgrast, constructSSN, showMetagenomicNet)
+export(topologicalAnalyzeNet, checkMgrastMetagenome, listMgrastProject, 
+  differentialAnalyzeNet,delMgrastInbox, estimateAbundance, 
+  generateMgrastWebkey, generateMgrastWebsession, getMgrastAnnotation, 
+  loginMgrast, submitMgrastJob, uploadMgrast, constructSSN, showMetagenomicNet)
 
 importFrom(Biobase, listLen)
 importFrom(stringr, "str_sub<-", str_sub, str_extract_all, str_extract)

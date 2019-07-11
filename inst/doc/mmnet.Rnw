@@ -358,13 +358,6 @@ This package takes KEGG database to annotate enzymatic genes with metabolic reac
 
 An initial reference data named \textit{RefDbcache.rda} was saved in "data" subdirectory of \emph{mment} that contains KOs and annotated with a metabolic reaction. Moreover, an KO based reference metabolic network was also saved in \textit{RefDbcache.rda}, where nodes represent enzymes (KOs), and the directed edge from enzyme A to enzyme B indicates that a product metabolite of a reaction catalyzed by enzyme A is a substrate metabolite of a reaction catalyzed by enzyme B. As KEGG database is constantly updated, reference data can be updated by function \textit{updateMetabolicNetwork} manually and saved in the directory user specified.
 
-Reference dataset can be loaded by function \textit{loadMetabolicData}
-
-<<initial-data,echo=TRUE>>=
-loadMetabolicData()
-summary(RefDbcache)
-@
-
 \subsection{Constructing State Specific Network}
 
 % The \emph{mmnet} provides function \emph{mapAnnotoKEGGPathway} for mapping the KOs  on KEGG global metabolic pathway. This function returns an url of colored map, users may automated open the url by optional "browse" or manually open it.
