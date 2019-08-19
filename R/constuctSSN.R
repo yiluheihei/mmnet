@@ -18,7 +18,9 @@ constructSSN <- function(abundance) {
       subabund <- abund.data[match.index]
       g <- set.graph.attribute(g, "name", "SSN")
       g <- set.vertex.attribute(g, "abundance", index = V(g), value = subabund)
-      g <- delete.vertices(g, names(which(igraph::degree(g, mode = "all") == 0)))
+      # not remove the nodes whose degree is 0, network merging may generate
+      # additional edges.
+      # g <- delete.vertices(g, names(which(igraph::degree(g, mode = "all") == 0)))
       return(g)
     }
     if (ncol(abundance) == 1 ){
