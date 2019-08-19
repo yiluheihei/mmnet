@@ -38,6 +38,12 @@ differentialAnalyzeNet <- function(ssns, sample.state, method = c("OR", "rank", 
     index <- lapply(c(1, 2), function(x) which(match(sample.state, state) == x))
     names(index) <- state
     g <- induced.subgraph(RefDbcache$network, intersect(kos, V(RefDbcache$network)$name))
+    
+    # giant component
+    giant_comp <- components(g)
+    giant_nodes <- groups(giant_comp)[[1]]
+    g <- induced_subgraph(g, giant_nodes)
+    
     abund <- lapply(index, function(x) ko.abund[, x])
     if (p.value) {
         if (ncol(ko.abund) < 10) 
